@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MathSnap — AI Math Solver</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="nav">
+    <div class="brand"><span class="brand-mark">∑</span><span>MathSnap</span></div>
+    <div class="nav-pill">AI • Step-by-step • Verified</div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div class="eyebrow">MATH PROBLEM SOLVER</div>
+      <h1>Snap a problem.<br><span>Solve it step by step.</span></h1>
+      <p>Upload a photo of your math problem and MathSnap will read it, solve it, explain every step, and independently check the result where possible.</p>
+    </section>
+
+    <section class="workspace">
+      <div class="upload-panel">
+        <div class="panel-heading">
+          <div>
+            <div class="panel-kicker">01 · INPUT</div>
+            <h2>Your problem</h2>
+          </div>
+          <button class="ghost-btn" id="demoBtn" type="button">Try demo</button>
+        </div>
+
+        <label class="dropzone" id="dropzone" for="fileInput">
+          <input id="fileInput" type="file" accept="image/*" hidden />
+          <div class="upload-icon">↥</div>
+          <strong>Drop your math image here</strong>
+          <span>or click to browse · JPG, PNG, WEBP · max 10 MB</span>
+        </label>
+
+        <div class="preview-wrap hidden" id="previewWrap">
+          <img id="preview" alt="Uploaded math problem preview" />
+          <button class="remove-btn" id="removeBtn" type="button">Remove image</button>
+        </div>
+
+        <div class="controls">
+          <button class="solve-btn" id="solveBtn" type="button" disabled>
+            <span id="solveLabel">Solve problem</span>
+            <span class="spinner hidden" id="spinner"></span>
+          </button>
+        </div>
+
+        <div class="privacy-note">Your API key stays on the server. The browser never receives it.</div>
+      </div>
+
+      <div class="result-panel">
+        <div class="panel-heading">
+          <div>
+            <div class="panel-kicker">02 · SOLUTION</div>
+            <h2>Step-by-step</h2>
+          </div>
+          <div class="status" id="status"><span></span> Ready</div>
+        </div>
+
+        <div id="emptyState" class="empty-state">
+          <div class="empty-symbol">∫</div>
+          <h3>Your solution will appear here</h3>
+          <p>Upload a problem and press <b>Solve problem</b>.</p>
+        </div>
+
+        <div id="result" class="result hidden">
+          <div class="question-card">
+            <div class="mini-label">DETECTED PROBLEM</div>
+            <div class="question" id="question"></div>
+            <div class="topic" id="topic"></div>
+          </div>
+
+          <div class="steps" id="steps"></div>
+
+          <div class="answer-card">
+            <div>
+              <div class="mini-label">FINAL ANSWER</div>
+              <div class="answer" id="answer"></div>
+            </div>
+            <div class="verification" id="verification"></div>
+          </div>
+        </div>
+
+        <div id="error" class="error hidden"></div>
+      </div>
+    </section>
+
+    <section class="examples">
+      <div class="section-title">
+        <span>WHAT IT CAN HANDLE</span>
+        <h2>From school algebra to advanced math.</h2>
+      </div>
+      <div class="chips">
+        <span>Algebra</span><span>Quadratics</span><span>Calculus</span><span>Trigonometry</span>
+        <span>Geometry</span><span>Matrices</span><span>Probability</span><span>Statistics</span>
+      </div>
+    </section>
+  </main>
+
+  <footer>MathSnap · Built for learning, not just answers.</footer>
+  <script src="app.js"></script>
+</body>
+</html>
