@@ -23,7 +23,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 MAX_IMAGE_MB = int(os.getenv("MAX_IMAGE_MB", "10"))
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
