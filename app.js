@@ -91,7 +91,7 @@ function renderResult(data) {
     if (step.latex) {
       const math = document.createElement("div");
       math.className = "math";
-      math.textContent = step.latex;
+      math.innerHTML = `\\[${step.latex}\\]`;
       card.appendChild(math);
     }
 
