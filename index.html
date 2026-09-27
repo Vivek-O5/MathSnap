@@ -5,7 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MathSnap — AI Math Solver</title>
   <link rel="stylesheet" href="styles.css" />
+
+  <!-- MathJax: renders LaTeX math beautifully -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']]
+      }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
+
 <body>
   <header class="nav">
     <div class="brand"><span class="brand-mark">∑</span><span>MathSnap</span></div>
@@ -93,14 +105,22 @@
         <span>WHAT IT CAN HANDLE</span>
         <h2>From school algebra to advanced math.</h2>
       </div>
+
       <div class="chips">
-        <span>Algebra</span><span>Quadratics</span><span>Calculus</span><span>Trigonometry</span>
-        <span>Geometry</span><span>Matrices</span><span>Probability</span><span>Statistics</span>
+        <span>Algebra</span>
+        <span>Quadratics</span>
+        <span>Calculus</span>
+        <span>Trigonometry</span>
+        <span>Geometry</span>
+        <span>Matrices</span>
+        <span>Probability</span>
+        <span>Statistics</span>
       </div>
     </section>
   </main>
 
   <footer>MathSnap · Built for learning, not just answers.</footer>
+
   <script src="app.js"></script>
 </body>
 </html>
