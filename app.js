@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000";
+const API_BASE = "https://mathsnap-1vc4.onrender.com";
 
 const fileInput = document.getElementById("fileInput");
 const dropzone = document.getElementById("dropzone");
