@@ -9,40 +9,86 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from google import genai
+from google.genai import types
+
 
 load_dotenv()
 
-app = FastAPI(title="MathSnap API", version="1.0.0")
+
+# ============================================================
+# APP CONFIGURATION
+# ============================================================
+
+app = FastAPI(
+    title="MathSnap API",
+    version="1.0.0"
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Tighten this to your deployed frontend domain in production.
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-MAX_IMAGE_MB = int(os.getenv("MAX_IMAGE_MB", "10"))
 
-client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY")
-) if os.getenv("GEMINI_API_KEY") else None
+MODEL = os.getenv(
+    "GEMINI_MODEL",
+    "gemini-2.5-flash"
+)
+
+MAX_IMAGE_MB = int(
+    os.getenv("MAX_IMAGE_MB", "10")
+)
+
+
+# ============================================================
+# GEMINI CLIENT
+# ============================================================
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+client = (
+    genai.Client(api_key=GEMINI_API_KEY)
+    if GEMINI_API_KEY
+    else None
+)
+
+
+# ============================================================
+# AI PROMPT
+# ============================================================
 
 PROMPT = r"""
 You are the math-recognition and explanation engine for MathSnap.
 
-Look carefully at the uploaded image. Identify the mathematical problem exactly.
-Do not invent missing symbols. If the image is unclear, say so.
+Look carefully at the uploaded image.
 
-Solve it step by step. Prefer exact symbolic answers over decimal approximations.
-Return ONLY valid JSON with this shape:
+Identify the mathematical problem exactly.
+
+Do not invent missing symbols.
+
+If the image is unclear, say so.
+
+Solve the problem step by step.
+
+Prefer exact symbolic answers over decimal approximations.
+
+Return ONLY valid JSON matching the requested structure.
+
+Required JSON structure:
 
 {
   "question": "clean transcription in plain text",
   "latex": "LaTeX transcription",
   "topic": "Algebra | Arithmetic | Calculus | Geometry | Trigonometry | Probability | Statistics | Matrices | Other",
   "steps": [
-    {"title": "Step 1", "explanation": "short explanation", "latex": "equation if useful"}
+    {
+      "title": "Step 1",
+      "explanation": "short explanation",
+      "latex": "equation if useful"
+    }
   ],
   "answer": "final answer in plain text",
   "answer_latex": "final answer in LaTeX",
@@ -50,132 +96,365 @@ Return ONLY valid JSON with this shape:
   "verification_type": "equation | arithmetic | none"
 }
 
-For equations, verification_expression should be the original equation in a form useful for substitution,
-such as "2*x^2 + 5*x - 3 = 0". For simple arithmetic, use the expression itself.
+For equations:
+
+verification_expression should contain the original equation
+in plain SymPy-style text.
+
+Example:
+
+2*x^2 + 5*x - 3 = 0
+
+For simple arithmetic:
+
+verification_expression should contain the arithmetic expression itself.
+
 Do not claim an answer is verified merely because you solved it.
 
-Formatting rules for math:
-- All "latex" and "answer_latex" fields must contain ONLY raw LaTeX, with NO delimiters
-  (no \[ \], no \( \), no $ or $$).
-- In "explanation" text, wrap any math in single dollar signs, e.g. "Apply the quadratic
-  formula $x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$."
-- Remember JSON escaping: every backslash must be doubled (\\frac, \\sqrt, \\pm).
-- Keep "verification_expression" in plain SymPy-style text (like 2*x^2 + 5*x - 3 = 0), NOT LaTeX.
+Formatting rules:
+
+- "latex" must contain ONLY raw LaTeX.
+- "answer_latex" must contain ONLY raw LaTeX.
+- Do NOT put $, $$, \( \), or \[ \] around LaTeX fields.
+- In explanation text, inline math may use single dollar signs.
+- Keep verification_expression in plain SymPy-style text.
+- Do not use Markdown code fences.
+- Return valid JSON only.
+
+If the image is unclear, explain the problem is unclear rather than guessing.
 """
+
+
+# ============================================================
+# HELPERS
+# ============================================================
 
 def strip_json_fences(text: str) -> str:
     text = text.strip()
+
     if text.startswith("```"):
-        text = re.sub(r"^```(?:json)?\s*", "", text)
-        text = re.sub(r"\s*```$", "", text)
+        text = re.sub(
+            r"^```(?:json)?\s*",
+            "",
+            text,
+            flags=re.IGNORECASE
+        )
+
+        text = re.sub(
+            r"\s*```$",
+            "",
+            text
+        )
+
     return text.strip()
 
+
+# ============================================================
+# SYMPY VERIFICATION
+# ============================================================
+
 def sympy_verify(data: dict[str, Any]) -> dict[str, Any]:
-    verification_type = data.get("verification_type", "none")
-    expr = (data.get("verification_expression") or "").strip()
-    answer = (data.get("answer") or "").strip()
+
+    verification_type = data.get(
+        "verification_type",
+        "none"
+    )
+
+    expr = (
+        data.get("verification_expression")
+        or ""
+    ).strip()
+
+    answer = (
+        data.get("answer")
+        or ""
+    ).strip()
 
     if not expr:
-        return {"status": "not_checked", "message": "No independently checkable expression was supplied."}
+        return {
+            "status": "not_checked",
+            "message": "No independently checkable expression was supplied."
+        }
 
     try:
+
+        # ----------------------------------------------------
+        # Arithmetic
+        # ----------------------------------------------------
+
         if verification_type == "arithmetic":
-            value = sp.sympify(expr, evaluate=True)
+
+            value = sp.sympify(
+                expr,
+                evaluate=True
+            )
+
             return {
                 "status": "verified",
-                "message": f"SymPy evaluated the expression to {sp.sstr(value)}."
+                "message": (
+                    f"SymPy evaluated the expression to "
+                    f"{sp.sstr(value)}."
+                )
             }
 
-        if verification_type == "equation":
-            # Try to extract candidate values from the answer.
-            candidates = re.findall(r"(?:x|y|z)\s*=\s*([\-+]?\d+(?:\.\d+)?(?:/\d+)?)", answer, re.I)
-            if "=" in expr:
-                left, right = expr.split("=", 1)
-                equation = sp.Eq(sp.sympify(left), sp.sympify(right))
-            else:
-                equation = sp.Eq(sp.sympify(expr), 0)
+        # ----------------------------------------------------
+        # Equation
+        # ----------------------------------------------------
 
-            variable = next(iter(equation.free_symbols), None)
+        if verification_type == "equation":
+
+            candidates = re.findall(
+                r"(?:x|y|z)\s*=\s*"
+                r"([\-+]?\d+(?:\.\d+)?(?:/\d+)?)",
+                answer,
+                re.I
+            )
+
+            if "=" in expr:
+
+                left, right = expr.split(
+                    "=",
+                    1
+                )
+
+                equation = sp.Eq(
+                    sp.sympify(left),
+                    sp.sympify(right)
+                )
+
+            else:
+
+                equation = sp.Eq(
+                    sp.sympify(expr),
+                    0
+                )
+
+            variable = next(
+                iter(equation.free_symbols),
+                None
+            )
+
             if variable is None:
-                return {"status": "verified", "message": "The equation contains no free variable."}
+
+                return {
+                    "status": "verified",
+                    "message": (
+                        "The equation contains no free variable."
+                    )
+                }
 
             if not candidates:
+
                 return {
                     "status": "not_checked",
-                    "message": "The solution could not be parsed into candidate values for substitution."
+                    "message": (
+                        "The solution could not be parsed into "
+                        "candidate values for substitution."
+                    )
                 }
 
             checks = []
             all_ok = True
-            for raw in candidates:
+
+            for raw_value in candidates:
+
                 try:
-                    val = sp.sympify(raw)
-                    ok = bool(equation.subs(variable, val))
-                    checks.append(f"{variable}={raw}: {'correct' if ok else 'does not satisfy the equation'}")
+
+                    val = sp.sympify(raw_value)
+
+                    ok = bool(
+                        equation.subs(
+                            variable,
+                            val
+                        )
+                    )
+
+                    checks.append(
+                        f"{variable}={raw_value}: "
+                        f"{'correct' if ok else 'does not satisfy the equation'}"
+                    )
+
                     all_ok = all_ok and ok
+
                 except Exception:
+
                     all_ok = False
 
             return {
-                "status": "verified" if all_ok else "failed",
+                "status": (
+                    "verified"
+                    if all_ok
+                    else "failed"
+                ),
                 "message": "; ".join(checks)
             }
 
-        return {"status": "not_checked", "message": "This problem type needs a specialized verifier."}
+        # ----------------------------------------------------
+        # No verifier
+        # ----------------------------------------------------
+
+        return {
+            "status": "not_checked",
+            "message": (
+                "This problem type needs a specialized verifier."
+            )
+        }
 
     except Exception as exc:
-        return {"status": "not_checked", "message": f"Independent check unavailable: {exc}"}
+
+        return {
+            "status": "not_checked",
+            "message": (
+                f"Independent check unavailable: {exc}"
+            )
+        }
+
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "model": MODEL, "ai_configured": client is not None}
+
+    return {
+        "ok": True,
+        "model": MODEL,
+        "ai_configured": client is not None
+    }
+
+
+# ============================================================
+# SOLVE ENDPOINT
+# ============================================================
 
 @app.post("/api/solve")
-async def solve(file: UploadFile = File(...)):
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(400, "Please upload an image file.")
+async def solve(
+    file: UploadFile = File(...)
+):
+
+    # --------------------------------------------------------
+    # Validate image
+    # --------------------------------------------------------
+
+    if (
+        not file.content_type
+        or not file.content_type.startswith("image/")
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail="Please upload an image file."
+        )
+
+    # --------------------------------------------------------
+    # Read image
+    # --------------------------------------------------------
 
     raw = await file.read()
+
     if len(raw) > MAX_IMAGE_MB * 1024 * 1024:
-        raise HTTPException(413, f"Image is too large. Maximum is {MAX_IMAGE_MB} MB.")
+
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Image is too large. "
+                f"Maximum is {MAX_IMAGE_MB} MB."
+            )
+        )
+
+    # --------------------------------------------------------
+    # Check Gemini API key
+    # --------------------------------------------------------
 
     if client is None:
+
         raise HTTPException(
-            503,
-            "OPENAI_API_KEY is not configured on the backend. Add it to backend/.env."
+            status_code=503,
+            detail=(
+                "GEMINI_API_KEY is not configured "
+                "on the backend."
+            )
         )
 
     mime = file.content_type
-    data_url = f"data:{mime};base64,{base64.b64encode(raw).decode('utf-8')}"
+
+    # --------------------------------------------------------
+    # Send image + prompt to Gemini
+    # --------------------------------------------------------
 
     try:
+
+        image_part = types.Part.from_bytes(
+            data=raw,
+            mime_type=mime
+        )
+
         response = client.models.generate_content(
-    model=MODEL,
-    contents=[
-        {
-            "parts": [
-                {"text": PROMPT},
-                {
-                    "inline_data": {
-                        "mime_type": mime,
-                        "data": base64.b64encode(raw).decode("utf-8"),
-                    }
-                },
-            ]
-        }
-    ],
-)
 
-text = strip_json_fences(response.text)
-result = json.loads(text)
+            model=MODEL,
+
+            contents=[
+                PROMPT,
+                image_part
+            ],
+
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            )
+        )
+
+        text = response.text or ""
+
+        text = strip_json_fences(text)
+
+        result = json.loads(text)
+
     except json.JSONDecodeError:
-        raise HTTPException(502, "The AI returned an invalid solution format. Please try the image again.")
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Gemini returned an invalid solution format. "
+                "Please try the image again."
+            )
+        )
+
     except Exception as exc:
-        raise HTTPException(502, f"AI solving failed: {exc}")
 
-    required = ["question", "steps", "answer"]
-    if any(key not in result for key in required):
-        raise HTTPException(502, "The AI response was incomplete.")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Gemini solving failed: {exc}"
+        )
 
-    result["verification"] = sympy_verify(result)
+    # --------------------------------------------------------
+    # Validate response
+    # --------------------------------------------------------
+
+    required = [
+        "question",
+        "steps",
+        "answer"
+    ]
+
+    if any(
+        key not in result
+        for key in required
+    ):
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "The AI response was incomplete."
+            )
+        )
+
+    # --------------------------------------------------------
+    # Independent verification
+    # --------------------------------------------------------
+
+    result["verification"] = sympy_verify(
+        result
+    )
+
     return result
