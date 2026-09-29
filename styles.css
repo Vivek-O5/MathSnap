@@ -47,7 +47,16 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-s
 .hidden{display:none!important}
 .question-card{background:#fafaff;border:1px solid #e8e8ff;border-radius:16px;padding:18px;margin-bottom:12px}
 .question{font-size:20px;font-weight:700;line-height:1.45;margin-top:8px;white-space:pre-wrap}.topic{display:inline-block;margin-top:12px;background:var(--soft);color:var(--accent);border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800}
-.steps{display:flex;flex-direction:column;gap:10px}.step{border:1px solid var(--line);border-radius:14px;padding:16px}.step-head{font-size:13px;font-weight:800;margin-bottom:6px}.step-explanation{font-size:13px;color:var(--muted);line-height:1.55}.math{font-family:Georgia,"Times New Roman",serif;font-size:20px;margin-top:10px;overflow-wrap:anywhere}
+.steps{display:flex;flex-direction:column;gap:10px}.step{border:1px solid var(--line);border-radius:14px;padding:16px}.step-head{font-size:13px;font-weight:800;margin-bottom:6px}.step-explanation{font-size:13px;color:var(--muted);line-height:1.55}
+
+/* ---- Math (KaTeX) styling ---- */
+.math{margin-top:10px;overflow-x:auto;overflow-y:hidden;padding:4px 0}
+.math .katex-display{margin:0;text-align:left}
+.math .katex{font-size:1.2em}
+.question .katex,.answer .katex,.step-explanation .katex{font-size:1em}
+.question{overflow-x:auto;overflow-y:hidden}
+/* ------------------------------ */
+
 .answer-card{margin-top:12px;border:1px solid #dcefe6;background:#f6fbf8;border-radius:16px;padding:18px;display:flex;justify-content:space-between;gap:15px;align-items:flex-start}.answer{font-size:24px;font-weight:850;margin-top:7px;overflow-wrap:anywhere}.verification{font-size:11px;font-weight:800;color:var(--success);max-width:220px;text-align:right;line-height:1.5}
 .error{padding:15px;border-radius:13px;background:#fff2f2;border:1px solid #f0caca;color:var(--danger);font-size:13px;line-height:1.5}
 .examples{padding:80px 0 20px;text-align:center}.section-title span{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--accent)}.section-title h2{font-size:28px;letter-spacing:-.04em;margin:9px 0 22px}.chips{display:flex;justify-content:center;gap:9px;flex-wrap:wrap}.chips span{background:#fff;border:1px solid var(--line);border-radius:999px;padding:9px 13px;font-size:12px;font-weight:700;color:#555b64}
