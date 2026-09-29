@@ -8,7 +8,7 @@ import sympy as sp
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from openai import OpenAI
+from google import genai
 
 load_dotenv()
 
@@ -21,9 +21,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
+MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 MAX_IMAGE_MB = int(os.getenv("MAX_IMAGE_MB", "10"))
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
+
+client = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY")
+) if os.getenv("GEMINI_API_KEY") else None
 
 PROMPT = r"""
 You are the math-recognition and explanation engine for MathSnap.
@@ -146,20 +149,25 @@ async def solve(file: UploadFile = File(...)):
     data_url = f"data:{mime};base64,{base64.b64encode(raw).decode('utf-8')}"
 
     try:
-        response = client.responses.create(
-            model=MODEL,
-            input=[
+        response = client.models.generate_content(
+    model=MODEL,
+    contents=[
+        {
+            "parts": [
+                {"text": PROMPT},
                 {
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": PROMPT},
-                        {"type": "input_image", "image_url": data_url},
-                    ],
-                }
-            ],
-        )
-        text = strip_json_fences(response.output_text)
-        result = json.loads(text)
+                    "inline_data": {
+                        "mime_type": mime,
+                        "data": base64.b64encode(raw).decode("utf-8"),
+                    }
+                },
+            ]
+        }
+    ],
+)
+
+text = strip_json_fences(response.text)
+result = json.loads(text)
     except json.JSONDecodeError:
         raise HTTPException(502, "The AI returned an invalid solution format. Please try the image again.")
     except Exception as exc:
