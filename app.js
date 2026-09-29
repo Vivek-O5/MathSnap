@@ -1,4 +1,4 @@
-const API_BASE = "https://mathsnap-1vc4.onrender.com";
+const API_BASE = "http://localhost:8000";
 
 const fileInput = document.getElementById("fileInput");
 const dropzone = document.getElementById("dropzone");
@@ -20,6 +20,10 @@ const answer = document.getElementById("answer");
 const verification = document.getElementById("verification");
 
 let selectedFile = null;
+
+/* ---------- Math rendering helpers (KaTeX) ---------- */
+
+// Strip \[ \], \( \), $$ $$ or $ $ wrappers the model may add
 function cleanLatex(s) {
   return (s || "")
     .replace(/^\s*(\\\[|\\\(|\$\$|\$)/, "")
@@ -27,8 +31,13 @@ function cleanLatex(s) {
     .trim();
 }
 
+// Render a pure LaTeX string into an element
 function renderMath(el, latex, display = true) {
   const tex = cleanLatex(latex);
+  if (!window.katex) {
+    el.textContent = tex;
+    return;
+  }
   try {
     katex.render(tex, el, { displayMode: display, throwOnError: false });
   } catch {
@@ -36,6 +45,7 @@ function renderMath(el, latex, display = true) {
   }
 }
 
+// Render text that may contain inline math like $x = 1/2$
 function renderText(el, text) {
   el.textContent = text || "";
   if (window.renderMathInElement) {
@@ -50,6 +60,8 @@ function renderText(el, text) {
     });
   }
 }
+
+/* ---------- UI helpers ---------- */
 
 function setStatus(label, mode = "") {
   status.className = "status " + mode;
@@ -98,15 +110,19 @@ function resetUpload() {
   setStatus("Ready");
 }
 
+/* ---------- Result rendering ---------- */
+
 function renderResult(data) {
+  // Question: prefer the LaTeX transcription
   if (data.latex) renderMath(question, data.latex, false);
-else question.textContent = data.question || "Problem not detected";
+  else question.textContent = data.question || "Problem not detected";
 
-topic.textContent = data.topic || "Math";
+  topic.textContent = data.topic || "Math";
 
-if (data.answer_latex) renderMath(answer, data.answer_latex, false);
-else answer.textContent = data.answer || "No final answer returned";
-  
+  // Answer: prefer the LaTeX version
+  if (data.answer_latex) renderMath(answer, data.answer_latex, false);
+  else answer.textContent = data.answer || "No final answer returned";
+
   steps.innerHTML = "";
   (data.steps || []).forEach((step, index) => {
     const card = document.createElement("article");
@@ -118,14 +134,14 @@ else answer.textContent = data.answer || "No final answer returned";
 
     const explanation = document.createElement("div");
     explanation.className = "step-explanation";
-    explanation.textContent = step.explanation || "";
+    renderText(explanation, step.explanation);
 
     card.append(head, explanation);
 
     if (step.latex) {
       const math = document.createElement("div");
       math.className = "math";
-      math.innerHTML = `\\[${step.latex}\\]`;
+      renderMath(math, step.latex, true);
       card.appendChild(math);
     }
 
@@ -148,6 +164,8 @@ else answer.textContent = data.answer || "No final answer returned";
   errorBox.classList.add("hidden");
   result.classList.remove("hidden");
 }
+
+/* ---------- API call ---------- */
 
 async function solve() {
   if (!selectedFile) return;
@@ -183,21 +201,27 @@ async function solve() {
   }
 }
 
+/* ---------- Demo ---------- */
+
 function demo() {
   const data = {
     question: "2x² + 5x − 3 = 0",
+    latex: "2x^2 + 5x - 3 = 0",
     topic: "Algebra · Quadratic",
     steps: [
-      { title: "Step 1 · Identify a, b and c", explanation: "For ax² + bx + c = 0, the coefficients are a = 2, b = 5, c = −3.", latex: "a = 2,\\quad b = 5,\\quad c = -3" },
-      { title: "Step 2 · Factor the quadratic", explanation: "Find two factors whose product is −6 and whose middle terms combine to 5x.", latex: "(2x-1)(x+3)=0" },
+      { title: "Step 1 · Identify a, b and c", explanation: "For $ax^2 + bx + c = 0$, the coefficients are $a = 2$, $b = 5$, $c = -3$.", latex: "a = 2,\\quad b = 5,\\quad c = -3" },
+      { title: "Step 2 · Factor the quadratic", explanation: "Find two factors whose product is $-6$ and whose middle terms combine to $5x$.", latex: "(2x-1)(x+3)=0" },
       { title: "Step 3 · Set each factor to zero", explanation: "A product is zero when at least one factor is zero.", latex: "2x-1=0\\quad\\text{or}\\quad x+3=0" },
       { title: "Step 4 · Solve", explanation: "Solve each linear equation.", latex: "x=\\frac12\\quad\\text{or}\\quad x=-3" }
     ],
     answer: "x = 1/2 or x = −3",
+    answer_latex: "x = \\frac{1}{2} \\quad \\text{or} \\quad x = -3",
     verification: { status: "verified", message: "Substitution confirms both roots satisfy the equation." }
   };
   renderResult(data);
 }
+
+/* ---------- Events ---------- */
 
 fileInput.addEventListener("change", () => setFile(fileInput.files[0]));
 removeBtn.addEventListener("click", resetUpload);
