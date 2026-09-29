@@ -20,6 +20,36 @@ const answer = document.getElementById("answer");
 const verification = document.getElementById("verification");
 
 let selectedFile = null;
+function cleanLatex(s) {
+  return (s || "")
+    .replace(/^\s*(\\\[|\\\(|\$\$|\$)/, "")
+    .replace(/(\\\]|\\\)|\$\$|\$)\s*$/, "")
+    .trim();
+}
+
+function renderMath(el, latex, display = true) {
+  const tex = cleanLatex(latex);
+  try {
+    katex.render(tex, el, { displayMode: display, throwOnError: false });
+  } catch {
+    el.textContent = tex;
+  }
+}
+
+function renderText(el, text) {
+  el.textContent = text || "";
+  if (window.renderMathInElement) {
+    renderMathInElement(el, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "\\(", right: "\\)", display: false },
+        { left: "\\[", right: "\\]", display: true },
+        { left: "$", right: "$", display: false },
+      ],
+      throwOnError: false,
+    });
+  }
+}
 
 function setStatus(label, mode = "") {
   status.className = "status " + mode;
