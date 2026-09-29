@@ -99,10 +99,14 @@ function resetUpload() {
 }
 
 function renderResult(data) {
-  question.textContent = data.question || "Problem not detected";
-  topic.textContent = data.topic || "Math";
-  answer.textContent = data.answer || "No final answer returned";
+  if (data.latex) renderMath(question, data.latex, false);
+else question.textContent = data.question || "Problem not detected";
 
+topic.textContent = data.topic || "Math";
+
+if (data.answer_latex) renderMath(answer, data.answer_latex, false);
+else answer.textContent = data.answer || "No final answer returned";
+  
   steps.innerHTML = "";
   (data.steps || []).forEach((step, index) => {
     const card = document.createElement("article");
