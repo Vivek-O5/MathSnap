@@ -2,6 +2,7 @@ import base64
 import json
 import os
 import re
+import time
 from typing import Any
 
 import sympy as sp
@@ -23,6 +24,7 @@ app = FastAPI(
     title="MathSnap API",
     version="1.0.0"
 )
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -147,6 +149,101 @@ def strip_json_fences(text: str) -> str:
         )
 
     return text.strip()
+
+
+# ============================================================
+# GEMINI RETRY LOGIC
+# ============================================================
+
+def is_temporary_gemini_error(exc: Exception) -> bool:
+    """
+    Detect temporary Gemini availability/capacity errors.
+
+    We retry errors such as:
+    - 503 UNAVAILABLE
+    - high demand
+    - temporary service unavailable
+    - 429 rate/resource limits
+    - 500 internal server errors
+    """
+
+    error_text = str(exc).upper()
+
+    temporary_errors = [
+        "503",
+        "UNAVAILABLE",
+        "HIGH DEMAND",
+        "SERVICE UNAVAILABLE",
+        "429",
+        "RESOURCE_EXHAUSTED",
+        "RATE LIMIT",
+        "500",
+        "INTERNAL"
+    ]
+
+    return any(
+        error in error_text
+        for error in temporary_errors
+    )
+
+
+def generate_with_retry(
+    image_part: types.Part,
+    max_attempts: int = 4
+):
+    """
+    Send the MathSnap request to Gemini.
+
+    If Gemini temporarily returns a 503/high-demand error,
+    automatically retry with increasing delays.
+
+    Attempts:
+        1 -> immediately
+        2 -> wait 2 seconds
+        3 -> wait 4 seconds
+        4 -> wait 8 seconds
+    """
+
+    last_error = None
+
+    for attempt in range(1, max_attempts + 1):
+
+        try:
+
+            response = client.models.generate_content(
+                model=MODEL,
+                contents=[
+                    PROMPT,
+                    image_part
+                ],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
+            )
+
+            return response
+
+        except Exception as exc:
+
+            last_error = exc
+
+            # If this is not a temporary error,
+            # don't waste time retrying it.
+            if not is_temporary_gemini_error(exc):
+                raise
+
+            # If this was the final attempt,
+            # return the original error.
+            if attempt == max_attempts:
+                raise last_error
+
+            # Exponential backoff:
+            # 2 sec -> 4 sec -> 8 sec
+            wait_time = 2 ** attempt
+
+            time.sleep(wait_time)
+
+    raise last_error
 
 
 # ============================================================
@@ -381,6 +478,7 @@ async def solve(
 
     # --------------------------------------------------------
     # Send image + prompt to Gemini
+    # WITH AUTOMATIC RETRY
     # --------------------------------------------------------
 
     try:
@@ -390,18 +488,9 @@ async def solve(
             mime_type=mime
         )
 
-        response = client.models.generate_content(
-
-            model=MODEL,
-
-            contents=[
-                PROMPT,
-                image_part
-            ],
-
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json"
-            )
+        response = generate_with_retry(
+            image_part=image_part,
+            max_attempts=4
         )
 
         text = response.text or ""
